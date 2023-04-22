@@ -1,0 +1,5 @@
+pymysql
+sqlalchemy
+pycryptodome
+rich
+pyperclip
