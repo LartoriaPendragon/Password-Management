@@ -7,7 +7,6 @@ from rich import print as printc
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
 from utils.dbconfig import create_app
 from config import Secrets
 from utils import add
@@ -33,58 +32,33 @@ parser.add_argument("-c", "--copy", action='store_true', help='Copy password to 
 args = parser.parse_args()
 
 
-def check_and_initialize_secrets():
-    # Create SQLAlchemy engine and session
-    engine = create_engine('mysql+pymysql://admin:root123@localhost/pm')
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
-    # Check if any secrets exist in the database
-    secret = session.query(Secrets).first()
-
-    if secret is None:
-        # If no secrets exist, prompt user to initialize them
-        printc("[green][+][/green] No secrets found in the database. Initializing secrets...")
-        master_password = getpass("Enter a master password: ")
-        device_secret = input("Enter a device secret: ")
-        initialize_secrets(master_password, device_secret)
-    else:
-        # If secrets exist, simply print a message
-        printc("[green][+][/green] Secrets found in the database.")
-
-
-def initialize_secrets(master_password, device_secret):
-    hashed_master_password = hashlib.sha256(master_password.encode()).hexdigest()
-
-    engine = create_engine('mysql+pymysql://admin:root123@localhost/pm')
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
-    secret = Secrets(masterkey_hash=hashed_master_password, device_secret=device_secret)
-    session.add(secret)
-    session.commit()
-
-    printc("[green][+][/green] Secrets initialized in the database")
-
-
-def inputAndValentry_idateMasterPassword():
+def inputAndValidateMasterPassword():
+    # Prompt the user for the master password
     mp = getpass("MASTER PASSWORD: ")
+
+    # Hash the provided master password using SHA-256
     hashed_mp = hashlib.sha256(mp.encode()).hexdigest()
 
+    # Set up the connection to the MySQL database
     engine = create_engine('mysql+pymysql://admin:root123@localhost/pm')
     Session = sessionmaker(bind=engine)
     session = Session()
 
+    # Query the first secret from the database
     secret = session.query(Secrets).first()
 
+    # If no secret is found, print an error message and return None
     if secret is None:
         printc("[red][!] The secrets were not initialized. Please run the script again.[/red]")
         return None
 
+    # Compare the hashed master password with the one stored in the database
+    # If they don't match, print an error message and return None
     if hashed_mp != secret.masterkey_hash:
         printc("[red][!] WRONG! [/red]")
         return None
 
+    # If the master password is correct, return the master password and device secret
     return [mp, secret.device_secret]
 
 
@@ -125,7 +99,7 @@ def main():
         if args.email == None:
             args.email = ""
 
-        res = inputAndValentry_idateMasterPassword()
+        res = inputAndValidateMasterPassword()
         if res is not None:
             with app.app_context():
                 password = getpass("Password: ")
@@ -135,7 +109,7 @@ def main():
     # Extract entry
     if args.option in ["extract", "e"]:
         with app.app_context():
-            res = inputAndValentry_idateMasterPassword()
+            res = inputAndValidateMasterPassword()
 
             search = {}
             if args.name is not None:
